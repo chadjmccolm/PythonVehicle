@@ -8,4 +8,4 @@ This program runs on python 3. There are no other requirements.
 
 # How to Use
 
-Provide the input time,speed coordinates in text and specify the timestamp and object properties. Run with python main.py in the terminal. The results will be output to a CSV file and that will be openned after creation in the default editor. 
+Provide the input time,speed coordinates in text and specify the timestamp and object properties. Run with `python main.py` in the terminal. The results will be output to a CSV file and that will be openned after creation in the default editor. 
