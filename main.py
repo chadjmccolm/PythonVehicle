@@ -7,7 +7,6 @@ import os
 from speedCommands import *
 
 timestep = 0.01
-# Speed commands are in kmph
 
 f = open('workfile.csv', 'w')
 

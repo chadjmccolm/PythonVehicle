@@ -1,3 +1,5 @@
+# Speed commands are ordered pairs of time,speed with units of seconds and kmph. If you're using Visual Studio Code ALT+Z will toggle Word Wrap to increase visibility
+
 # Speed commands for a few acceleration pulls
 #speedCommands = [[0, 0], [10, 0], [14, 100], [20, 0], [30, 0], [34, 100], [40, 100], [50, 0]]
 
