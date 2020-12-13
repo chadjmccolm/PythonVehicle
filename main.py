@@ -1,6 +1,6 @@
 # todo:
-#  - seperation of regen and braking
-#  - incline
+#  - regen to batter
+#  - motor limits
 
 import time
 import os
@@ -81,7 +81,7 @@ class VehicleBody:
 class Wheel: 
 
     # Properties of the wheel
-    mu = 1.2
+    mu = 1.0
     diameter = 0.63
 
     # Inputs to calculations
@@ -131,32 +131,6 @@ class Axle:
         self.rotational_speed_input = self.rotational_speed_output * self.ratio
         self.torque_output = self.torque_input * self.ratio
 
-class Driver: 
-
-    # Properties of the driver
-    K_p = 0.03
-    K_i = 0.001
-    K_d = 0
-
-    error = 0
-    integral_error = 0
-    timestep = 0
-
-    # Inputs to calculations
-    currentSpeed = 0
-    desiredSpeed = 0
-
-    # Forward calculated values
-    effort = 0
-
-    def calculate(self):
-
-        self.error = self.desiredSpeed - self.currentSpeed
-        self.integral_error = self.integral_error + self.error
-
-        self.effort = self.error * self.K_p + self.integral_error * self.K_i
-        self.effort = max(min(self.effort, 100), -100)
-
 class Motor: 
 
     # Properties of the motor
@@ -175,24 +149,125 @@ class Motor:
     def calculate(self):
 
         # Control torque
-        self.output_torque = self.max_torque * self.effort
+        self.output_torque = self.max_torque * self.effort / 100.0
 
         self.output_power = self.output_torque * self.rotational_speed
         
-        if self.output_power > 0:
-            self.energy_used = self.energy_used + self.output_power * self.timestep
+        self.energy_used = self.energy_used + self.output_power * self.timestep
 
+class Brakes:
+
+    # Properties of brakes
+
+    # Inputs to calculations
+    max_torque = 0
+    rotational_speed = 0
+    effort = 0
+    timestep = 0
+
+    # Forward calculated values
+    braking_torque = 0
+    braking_power = 0
+    energy_wasted = 0
+    ideal_bias = 0
+
+    def calculate(self):
+
+        # Control the torque
+        self.braking_torque = self.max_torque * self.effort / 100.0
+
+        self.braking_power = self.braking_torque * self.rotational_speed
+
+        if self.braking_power > 0:
+            self.energy_wasted = self.energy_wasted + self.braking_power * self.timestep
+
+class Driver: 
+
+    # Properties of the driver
+    K_p = 20
+    K_i = 0
+    K_d = 0
+
+    error = 0
+    integral_error = 0
+    timestep = 0
+
+    # Inputs to calculations
+    currentSpeed = 0
+    desiredSpeed = 0
+
+    # Forward calculated values
+    effort = 0
+
+    def calculate(self):
+
+        self.error = self.desiredSpeed - self.currentSpeed
+        self.integral_error = self.integral_error + self.error
+
+        self.effort = self.error * self.K_p + self.integral_error * self.K_i + 30
+        self.effort = max(min(self.effort, 100), -100)
+
+class Vehicle_Controller:
+
+    # Properties of the vehicle controller
+    max_regen = -30
+    balance_point = 30
+
+    # Inputs to calculations
+    effort = 0
+
+    # Forward Calculated Values
+    motor_effort = 0
+    front_brake_effort = 0
+    rear_brake_effort = 0
+
+    def calculate(self):
+
+        # Determine whether it is in propulsion, or braking
+
+        if self.effort > self.balance_point :
+
+            self.motor_effort = 100.0/(100-self.balance_point)*(self.effort-self.balance_point)
+
+        else :
+
+            # Calculate the regen command
+            self.motor_effort = -1*self.max_regen/self.balance_point*self.effort+self.max_regen
+            self.motor_effort = max(self.motor_effort, self.max_regen)
+
+            # Calculate the braking command
+            if self.effort < 0:
+
+                # Scale the braking command -100->100, 0->0
+                braking_command = self.effort * -1
+                self.front_brake_effort = braking_command
+                self.rear_brake_effort = braking_command
+                
+
+# Declare all objects
 vehicle = VehicleBody()
+
 rear_wheel = Wheel()
+front_wheel = Wheel()
+
 final_drive = Axle()
-driver = Driver()
-driver.timestep = timestep
+
 motor = Motor()
 motor.timestep = timestep
 
+front_brakes = Brakes()
+front_brakes.timestep = timestep
+rear_brakes = Brakes()
+rear_brakes.timestep = timestep
+
+driver = Driver()
+driver.timestep = timestep
+
+controller = Vehicle_Controller()
+
 print("Objects Created.\n")
 
-f.write("Time, Target Speed, Actual Speed, Power Required, Energy Required, Distance Travelled\n")
+f.write("Time, Target Speed, Actual Speed, Power Used, Energy Used, Braking Power, Braking Energy\n")
 
 print("Starting Calculation.\n")
 start_time = time.time()
@@ -201,9 +276,20 @@ for command in calculatedCommands:
     
     vehicle.calculate()
 
+    front_wheel.normal_force = vehicle.weight_front_wheel
+    front_wheel.ground_speed = vehicle.velocity
+    front_wheel.calculate()
+
     rear_wheel.normal_force = vehicle.weight_rear_wheel
     rear_wheel.ground_speed = vehicle.velocity
     rear_wheel.calculate()
+
+    front_brakes.max_torque = front_wheel.maximum_torque
+    rear_brakes.max_torque = rear_wheel.maximum_torque
+    front_brakes.rotational_speed = front_wheel.rotational_speed
+    rear_brakes.rotational_speed = rear_wheel.rotational_speed
+    front_brakes.calculate()
+    rear_brakes.calculate()
 
     final_drive.maximum_torque_output = rear_wheel.maximum_torque
     final_drive.rotational_speed_output = rear_wheel.rotational_speed
@@ -216,22 +302,26 @@ for command in calculatedCommands:
     final_drive.torque_input = motor.output_torque
     final_drive.calculate()
 
-    rear_wheel.applied_torque = final_drive.torque_output
+    front_wheel.applied_torque = -1*front_brakes.braking_torque
+    front_wheel.calculate()
+
+    rear_wheel.applied_torque = final_drive.torque_output - rear_brakes.braking_torque
     rear_wheel.calculate()
 
-    vehicle.force = rear_wheel.applied_force
+    vehicle.force = rear_wheel.applied_force + front_wheel.applied_force
 
     driver.currentSpeed = vehicle.velocity / 27.7*100
     driver.desiredSpeed = command[1]
     driver.calculate()
 
-    motor.effort = driver.effort
+    controller.effort = driver.effort
+    controller.calculate()
 
-    #print(str(command[0]) + ", " + str(vehicle.velocity / 27.7*100))
-    #print("Speed difference: " + str(vehicle.velocity / 27.7*100 - command[1]) + "\tEffort: " + str(motor.effort))
-    #print(str(command[1]) + ", " + str(vehicle.velocity / 27.7*100))
-    f.write(str(command[0]) + "," + str(command[1]) + "," + str(vehicle.velocity / 27.7*100) + "," + str(motor.output_power) + "," + str(motor.energy_used) + "," + str(vehicle.displacement) + "\n")
-    #print(motor.output_power)
+    motor.effort = controller.motor_effort
+    front_brakes.effort = controller.front_brake_effort
+    rear_brakes.effort = controller.rear_brake_effort
+
+    f.write(str(command[0]) + "," + str(command[1]) + "," + str(vehicle.velocity / 27.7*100) + "," + str(motor.output_power) + "," + str(motor.energy_used) + "," + str(front_brakes.braking_power + rear_brakes.braking_torque) + "," + str(front_brakes.energy_wasted + rear_brakes.energy_wasted) + "\n")
 
 elapsed_time = time.time() - start_time
 print("Calculation Complete in " + str(elapsed_time) + " seconds.")
