@@ -134,7 +134,9 @@ class Axle:
 class Motor: 
 
     # Properties of the motor
-    
+    T_max = 270
+    P_max = 100000
+
     # Inputs to calculations
     max_torque = 0
     rotational_speed = 0
@@ -150,6 +152,13 @@ class Motor:
 
         # Control torque
         self.output_torque = self.max_torque * self.effort / 100.0
+
+        if self.rotational_speed > 0 :
+            motor_available_torque = min(self.P_max/self.rotational_speed, self.T_max)
+        else:
+            motor_available_torque = self.T_max
+
+        self.output_torque = max(min(self.output_torque, motor_available_torque), -1*motor_available_torque)
 
         self.output_power = self.output_torque * self.rotational_speed
         
@@ -267,7 +276,7 @@ controller = Vehicle_Controller()
 
 print("Objects Created.\n")
 
-f.write("Time, Target Speed, Actual Speed, Power Used, Energy Used, Braking Power, Braking Energy\n")
+f.write("Time, Target Speed, Actual Speed, Power Used, Motor Speed, Braking Power, Braking Energy\n")
 
 print("Starting Calculation.\n")
 start_time = time.time()
@@ -321,7 +330,7 @@ for command in calculatedCommands:
     front_brakes.effort = controller.front_brake_effort
     rear_brakes.effort = controller.rear_brake_effort
 
-    f.write(str(command[0]) + "," + str(command[1]) + "," + str(vehicle.velocity / 27.7*100) + "," + str(motor.output_power) + "," + str(motor.energy_used) + "," + str(front_brakes.braking_power + rear_brakes.braking_torque) + "," + str(front_brakes.energy_wasted + rear_brakes.energy_wasted) + "\n")
+    f.write(str(command[0]) + "," + str(command[1]) + "," + str(vehicle.velocity / 27.7*100) + "," + str(motor.output_power) + "," + str(motor.rotational_speed) + "," + str(front_brakes.braking_power + rear_brakes.braking_torque) + "," + str(front_brakes.energy_wasted + rear_brakes.energy_wasted) + "\n")
 
 elapsed_time = time.time() - start_time
 print("Calculation Complete in " + str(elapsed_time) + " seconds.")
