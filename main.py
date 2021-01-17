@@ -1,6 +1,5 @@
-# todo:
-#  - regen to batter
-#  - motor limits
+# todo
+# - TBD
 
 import time
 import os
@@ -39,15 +38,15 @@ print("Path Generated with " + str(len(calculatedCommands)) + " steps.\n")
 class VehicleBody:
 
     # Properties of every vehicle
-    mass = 226
-    wheelbase = 1.40
-    cog_z = 0.4
-    cog_x = 0.70
+    mass = 650
+    wheelbase = 2.04
+    cog_z = 0.3
+    cog_x = 1.224
 
     C_rr = 0.02
 
-    frontal_area = 0.95
-    C_d = 0.46
+    frontal_area = 1.533
+    C_d = 0.51
 
     # Inputs to calculations
     force = 0.0
@@ -82,7 +81,7 @@ class Wheel:
 
     # Properties of the wheel
     mu = 1.0
-    diameter = 0.63
+    diameter = 0.48514
 
     # Inputs to calculations
     normal_force = 0
@@ -110,7 +109,7 @@ class Wheel:
 class Axle:
 
     # Properties of the axle
-    ratio = 4
+    ratio = 3.105
 
     # Inputs to calculations
     maximum_torque_output = 0
@@ -330,7 +329,7 @@ for command in calculatedCommands:
     front_brakes.effort = controller.front_brake_effort
     rear_brakes.effort = controller.rear_brake_effort
 
-    f.write(str(command[0]) + "," + str(command[1]) + "," + str(vehicle.velocity / 27.7*100) + "," + str(motor.output_power) + "," + str(motor.rotational_speed) + "," + str(front_brakes.braking_power + rear_brakes.braking_torque) + "," + str(front_brakes.energy_wasted + rear_brakes.energy_wasted) + "\n")
+    f.write(str(command[0]) + "," + str(command[1]) + "," + str(vehicle.velocity / 27.7*100) + "," + str(motor.energy_used) + "," + str(vehicle.displacement) + "," + str(front_brakes.braking_power + rear_brakes.braking_torque) + "," + str(front_brakes.energy_wasted + rear_brakes.energy_wasted) + "\n")
 
 elapsed_time = time.time() - start_time
 print("Calculation Complete in " + str(elapsed_time) + " seconds.")
